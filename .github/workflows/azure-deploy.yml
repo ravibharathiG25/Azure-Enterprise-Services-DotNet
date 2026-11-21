@@ -1,0 +1,82 @@
+name: Build, Test & Deploy to Azure App Service
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+env:
+  DOTNET_VERSION: '8.0.x'
+  AZURE_WEBAPP_NAME: 'app-azureservices-prod'
+  AZURE_WEBAPP_SLOT: 'staging'
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Setup .NET SDK
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+
+    - name: Restore Dependencies
+      run: dotnet restore "AzureEnterpriseServices.slnx"
+
+    - name: Build Solution
+      run: dotnet build "AzureEnterpriseServices.slnx" --configuration Release --no-restore
+
+    - name: Publish API for App Service
+      run: dotnet publish "AzureServices.AppService.Api/AzureServices.AppService.Api.csproj" -c Release -o ./publish-api
+
+    - name: Publish Azure Functions
+      run: dotnet publish "AzureServices.Functions/AzureServices.Functions.csproj" -c Release -o ./publish-functions
+
+    - name: Upload API Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: webapp-api
+        path: ./publish-api
+
+  deploy-to-staging:
+    needs: build-and-test
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Download API Artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: webapp-api
+        path: ./api-binaries
+
+    - name: Log in to Azure (OIDC / Federated Credentials)
+      uses: azure/login@v2
+      with:
+        client-id: ${{ secrets.AZURE_CLIENT_ID }}
+        tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+        subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+    - name: Deploy to Azure App Service Staging Slot
+      uses: azure/webapps-deploy@v3
+      with:
+        app-name: ${{ env.AZURE_WEBAPP_NAME }}
+        slot-name: ${{ env.AZURE_WEBAPP_SLOT }}
+        package: ./api-binaries
+
+    - name: Health Check on Staging Slot
+      run: |
+        echo "Executing health probe on staging slot..."
+        curl -f https://${{ env.AZURE_WEBAPP_NAME }}-${{ env.AZURE_WEBAPP_SLOT }}.azurewebsites.net/healthz || exit 1
+
+    - name: Swap Staging Slot to Production (Zero-Downtime Deployment)
+      uses: azure/CLI@v2
+      with:
+        inlineScript: |
+          az webapp deployment slot swap \
+            --resource-group rg-azureservices-prod \
+            --name ${{ env.AZURE_WEBAPP_NAME }} \
+            --slot ${{ env.AZURE_WEBAPP_SLOT }} \
+            --target-slot production

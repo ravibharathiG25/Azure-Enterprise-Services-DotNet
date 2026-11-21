@@ -1,0 +1,34 @@
+{
+  "version": "2.0",
+  "logging": {
+    "applicationInsights": {
+      "samplingSettings": {
+        "isEnabled": true,
+        "excludedTypes": "Request"
+      },
+      "enableLiveMetricsFilters": true
+    },
+    "logLevel": {
+      "default": "Information",
+      "Function": "Information",
+      "Host.Aggregator": "Warning"
+    }
+  },
+  "extensions": {
+    "serviceBus": {
+      "prefetchCount": 100,
+      "messageHandlerOptions": {
+        "autoCompleteMessages": true,
+        "maxConcurrentCalls": 16,
+        "maxAutoLockRenewalDuration": "00:05:00"
+      }
+    },
+    "durableTask": {
+      "hubName": "OrderWorkflowHub",
+      "storageProvider": {
+        "type": "azureStorage",
+        "connectionStringName": "AzureWebJobsStorage"
+      }
+    }
+  }
+}

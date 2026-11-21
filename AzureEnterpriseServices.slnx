@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="AzureServices.AppService.Api/AzureServices.AppService.Api.csproj" />
+  <Project Path="AzureServices.Core/AzureServices.Core.csproj" />
+  <Project Path="AzureServices.Functions/AzureServices.Functions.csproj" />
+  <Project Path="AzureServices.Infrastructure/AzureServices.Infrastructure.csproj" />
+</Solution>
